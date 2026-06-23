@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.company.slack-dashboard</string>
+
+  <!-- 로그인 시 자동 시작, 종료 시 재시작 -->
+  <key>RunAtLoad</key>     <true/>
+  <key>KeepAlive</key>     <true/>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/python3</string>  <!-- which python3 결과로 교체 -->
+    <string>/Users/사용자이름/slack-dashboard/app.py</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TZ</key>             <string>Asia/Seoul</string>
+    <key>PATH</key>           <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>DASHBOARD_HOST</key> <string>0.0.0.0</string>
+    <key>DASHBOARD_PORT</key> <string>8765</string>
+  </dict>
+
+  <!-- 작업 디렉토리 -->
+  <key>WorkingDirectory</key>
+  <string>/Users/사용자이름/slack-dashboard</string>
+
+  <key>StandardOutPath</key>
+  <string>/Users/사용자이름/Library/Logs/slack-dashboard.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/사용자이름/Library/Logs/slack-dashboard-error.log</string>
+</dict>
+</plist>

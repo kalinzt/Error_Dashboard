@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.company.slack-collector</string>
+
+  <!-- 매일 오전 11시 실행 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>   <integer>11</integer>
+    <key>Minute</key> <integer>0</integer>
+  </dict>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/python3</string>  <!-- which python3 결과로 교체 -->
+    <string>/Users/사용자이름/slack-dashboard/collector.py</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TZ</key>   <string>Asia/Seoul</string>
+    <key>PATH</key> <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/사용자이름/Library/Logs/slack-collector.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/사용자이름/Library/Logs/slack-collector-error.log</string>
+
+  <key>RunAtLoad</key>  <false/>
+</dict>
+</plist>

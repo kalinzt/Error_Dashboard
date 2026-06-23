@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>오류 보고 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:      #0e1117;
+    --surface: #161b27;
+    --card:    #1c2133;
+    --border:  #2a3048;
+    --text:    #e2e4f0;
+    --muted:   #8b90a8;
+    --purple:  #7c6deb;
+    --purple2: #a99ef5;
+    --teal:    #1da87c;
+    --teal2:   #4dd4a0;
+    --amber:   #e8a317;
+    --coral:   #e05c3a;
+    --blue:    #4a90d9;
+    --radius:  10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* Nav */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 6px var(--coral); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .nav-title { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .nav-title span { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .nav-right { display: flex; align-items: center; gap: 16px; color: var(--muted); font-size: 12px; }
+  .sync-badge { display: flex; align-items: center; gap: 5px; background: var(--card); border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+
+  /* Main */
+  main { padding: 24px 28px; max-width: 1600px; margin: 0 auto; }
+
+  /* Period tabs */
+  .period-bar { display: flex; gap: 6px; margin-bottom: 24px; }
+  .period-btn { padding: 7px 18px; border-radius: 20px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 13px; cursor: pointer; transition: all .15s; }
+  .period-btn:hover { border-color: var(--purple); color: var(--purple2); }
+  .period-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 500; }
+
+  /* Stats cards */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+  .stat-value { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 8px; }
+  .stat-change { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .stat-change.up { color: var(--coral); }
+  .stat-change.dn { color: var(--teal); }
+  .stat-change.neu { color: var(--muted); }
+  .stat-top { color: var(--purple2); font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .stat-sub { font-size: 12px; color: var(--muted); }
+  .top-cats-list { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  .top-cat-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .top-cat-rank { color: var(--muted); font-size: 11px; font-weight: 600; min-width: 14px; }
+  .top-cat-name { color: var(--purple2); font-weight: 600; flex: 1; }
+  .top-cat-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  /* Charts layout */
+  .charts-row { display: grid; gap: 16px; margin-bottom: 16px; }
+  .charts-row.row1 { grid-template-columns: 2fr 1fr; }
+  .charts-row.row2 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; }
+  .chart-title { font-size: 13px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .chart-title-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .cat-filter-bar { display: flex; gap: 4px; flex-wrap: wrap; }
+  .cat-btn { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .cat-btn:hover { border-color: var(--purple); color: var(--purple2); }
+  .cat-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+  .chart-wrap { position: relative; }
+
+  /* Table */
+  .table-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 28px; }
+  .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: rgba(124,109,235,.07); }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 10px 12px; vertical-align: top; }
+  .td-time { color: var(--muted); white-space: nowrap; }
+  .td-detail { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+  .pill-student { background: rgba(74,144,217,.15); color: #7eb8f0; }
+  .pill-teacher { background: rgba(29,168,124,.15); color: #4dd4a0; }
+  .pill-cat { background: rgba(124,109,235,.15); color: #a99ef5; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+
+  /* Pagination */
+  .pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; gap: 12px; flex-wrap: wrap; }
+  .pag-info { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .pag-controls { display: flex; align-items: center; gap: 6px; }
+  .pag-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer; transition: all .15s; min-width: 32px; text-align: center; }
+  .pag-btn:hover:not(:disabled) { border-color: var(--purple); color: var(--purple2); }
+  .pag-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 500; }
+  .pag-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .pag-btn.pag-ellipsis { cursor: default; border-color: transparent; background: transparent; }
+  .pag-btn.pag-ellipsis:hover { color: var(--muted); border-color: transparent; }
+  .per-page-wrap { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .per-page-select { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+  .per-page-select:focus { outline: none; border-color: var(--purple); }
+
+  /* Table inline filter dropdowns */
+  .table-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dd-wrap { position: relative; }
+  .dd-btn { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap; min-width: 120px; justify-content: space-between; }
+  .dd-btn:hover, .dd-btn.open { border-color: var(--purple); color: var(--text); }
+  .dd-btn.selected { border-color: var(--purple); color: var(--purple2); background: rgba(124,109,235,.1); }
+  .dd-btn .dd-arrow { font-size: 10px; color: var(--muted); transition: transform .15s; }
+  .dd-btn.open .dd-arrow { transform: rotate(180deg); }
+  .dd-panel { position: absolute; top: calc(100% + 4px); left: 0; min-width: 220px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 200; overflow: hidden; }
+  .dd-search { width: 100%; padding: 8px 12px; background: var(--surface); border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 12px; outline: none; }
+  .dd-search::placeholder { color: var(--muted); }
+  .dd-list { max-height: 220px; overflow-y: auto; }
+  .dd-item { padding: 8px 14px; font-size: 12px; color: var(--muted); cursor: pointer; transition: background .1s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dd-item:hover { background: rgba(124,109,235,.1); color: var(--text); }
+  .dd-item.active { color: var(--purple2); font-weight: 500; }
+  .dd-empty { padding: 12px 14px; font-size: 12px; color: var(--muted); text-align: center; }
+  .dd-reset-btn { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .dd-reset-btn:hover { border-color: var(--coral); color: var(--coral); }
+
+  /* Error detail modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .modal-backdrop.hidden { display: none; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.6); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 16px; border-bottom: 1px solid var(--border); }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; transition: color .15s; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .modal-field { display: flex; flex-direction: column; gap: 4px; }
+  .modal-field-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .modal-field-value { font-size: 13px; color: var(--text); line-height: 1.6; word-break: break-word; }
+  .modal-field-value.detail { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; font-size: 13px; }
+  .modal-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  tbody tr { cursor: pointer; }
+
+  /* Loading spinner */
+  .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: var(--muted); }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--purple); border-radius: 50%; animation: spin .7s linear infinite; margin-right: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Sub-period selector bar (quarterly / semi_annual) */
+  .sub-period-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .sub-period-hint { font-size: 12px; color: var(--muted); }
+  .sub-year-row, .sub-unit-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sub-year-btn, .sub-unit-btn { padding: 5px 16px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .sub-year-btn:hover:not(:disabled), .sub-unit-btn:hover:not(:disabled) { border-color: var(--purple); color: var(--purple2); }
+  .sub-year-btn.active, .sub-unit-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 500; }
+  .sub-unit-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* No-data modal */
+  .nodata-modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 380px; box-shadow: 0 24px 64px rgba(0,0,0,.6); padding: 32px 28px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+  .nodata-icon { font-size: 36px; }
+  .nodata-msg { font-size: 14px; color: var(--text); line-height: 1.6; }
+  .nodata-close { padding: 8px 24px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; cursor: pointer; transition: all .15s; }
+  .nodata-close:hover { border-color: var(--purple); color: var(--purple2); }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row.row1 { grid-template-columns: 1fr; }
+    .charts-row.row2 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 700px) {
+    main { padding: 16px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .charts-row.row2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-dot"></div>
+    <div class="nav-title">오류 보고 대시보드 <span>x-seoltab-error-reporting</span></div>
+  </div>
+  <div class="nav-right">
+    <div class="sync-badge">
+      <div class="sync-dot"></div>
+      <span id="last-sync">불러오는 중…</span>
+    </div>
+    <span id="auto-refresh-label" style="color:var(--teal);font-size:11px">● 1시간마다 갱신</span>
+  </div>
+</nav>
+
+<main>
+  <!-- 기간 선택 -->
+  <div class="period-bar">
+    <button class="period-btn active" data-period="weekly">주별 (7일)</button>
+    <button class="period-btn" data-period="daily">일별 (30일)</button>
+    <button class="period-btn" data-period="monthly">월별 (12개월)</button>
+    <button class="period-btn" data-period="quarterly">분기별</button>
+    <button class="period-btn" data-period="semi_annual">반기별</button>
+    <button class="period-btn" data-period="annual">연도별</button>
+  </div>
+
+  <!-- 분기/반기 서브 선택 바 -->
+  <div id="sub-period-bar" class="sub-period-bar" style="display:none">
+    <div class="sub-period-hint" id="sub-period-hint">연도를 선택하세요</div>
+    <div class="sub-year-row" id="sub-year-row"></div>
+    <div class="sub-unit-row" id="sub-unit-row" style="display:none"></div>
+  </div>
+
+  <!-- 통계 카드 -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label" id="s-period-label">기간 합계</div>
+      <div class="stat-value" id="s-period" style="color:var(--blue)">—</div>
+      <div class="stat-change neu" id="s-period-sub">필터를 선택하세요</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">이번 주</div>
+      <div class="stat-value" id="s-week" style="color:var(--amber)">—</div>
+      <div class="stat-change neu" id="s-week-chg">전주 대비 계산 중</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">이번 달</div>
+      <div class="stat-value" id="s-month" style="color:var(--purple2)">—</div>
+      <div class="stat-change neu" id="s-month-chg">전월 대비 계산 중</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" id="s-top-cats-label">최근 12개월 오류 유형 Top 3</div>
+      <div class="top-cats-list" id="s-top-cats"></div>
+    </div>
+  </div>
+
+  <!-- 메인 차트: 추이 + 오류 유형 -->
+  <div class="charts-row row1">
+    <div class="chart-card">
+      <div class="chart-title-row">
+        <div class="chart-title">오류 발생 추이</div>
+        <div class="cat-filter-bar" id="cat-filter-bar">
+          <button class="cat-btn active" data-cat="">전체</button>
+          <button class="cat-btn" data-cat="오디오/마이크">오디오/마이크</button>
+          <button class="cat-btn" data-cat="펜/필기">펜/필기</button>
+          <button class="cat-btn" data-cat="연결/끊김">연결/끊김</button>
+          <button class="cat-btn" data-cat="화면/UI">화면/UI</button>
+          <button class="cat-btn" data-cat="컨텐츠">컨텐츠</button>
+          <button class="cat-btn" data-cat="앱/업데이트">앱/업데이트</button>
+          <button class="cat-btn" data-cat="앱/기능">앱/기능</button>
+          <button class="cat-btn" data-cat="기타">기타</button>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="chart-trend"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">오류 유형 분류</div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="chart-cat"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 보조 차트: 사용자 유형 + 디바이스 + 앱 버전 -->
+  <div class="charts-row row2">
+    <div class="chart-card">
+      <div class="chart-title">사용자 유형</div>
+      <div class="chart-wrap" style="flex:1; min-height:0;">
+        <canvas id="chart-user"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">디바이스 분포 Top10</div>
+      <div class="chart-wrap" style="height:250px">
+        <canvas id="chart-device"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">앱 버전 분포</div>
+      <div class="chart-wrap" style="height:250px">
+        <canvas id="chart-version"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 최근 오류 테이블 -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="chart-title" style="margin:0">최근 오류 목록</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div class="table-filters">
+          <button class="dd-reset-btn" id="dd-reset-btn" onclick="resetErrorFilters()" style="display:none">✕ 필터 초기화</button>
+          <div class="dd-wrap" id="dd-device-wrap">
+            <button class="dd-btn" id="dd-device-btn" onclick="toggleDd('device')">
+              <span id="dd-device-label">디바이스</span>
+              <span class="dd-arrow">▾</span>
+            </button>
+            <div class="dd-panel" id="dd-device-panel" style="display:none">
+              <input class="dd-search" id="dd-device-search" placeholder="검색..." oninput="searchDd('device')" onclick="event.stopPropagation()">
+              <ul class="dd-list" id="dd-device-list"></ul>
+            </div>
+          </div>
+          <div class="dd-wrap" id="dd-version-wrap">
+            <button class="dd-btn" id="dd-version-btn" onclick="toggleDd('version')">
+              <span id="dd-version-label">앱 버전</span>
+              <span class="dd-arrow">▾</span>
+            </button>
+            <div class="dd-panel" id="dd-version-panel" style="display:none">
+              <input class="dd-search" id="dd-version-search" placeholder="검색..." oninput="searchDd('version')" onclick="event.stopPropagation()">
+              <ul class="dd-list" id="dd-version-list"></ul>
+            </div>
+          </div>
+        </div>
+        <span style="color:var(--muted);font-size:12px" id="error-count"></span>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>발생 시간</th>
+            <th>사용자 번호</th>
+            <th>유형</th>
+            <th>오류 분류</th>
+            <th>오류 내용</th>
+            <th>디바이스</th>
+            <th>앱 버전</th>
+          </tr>
+        </thead>
+        <tbody id="error-tbody">
+          <tr><td colspan="7" class="empty"><div class="loading"><div class="spinner"></div>데이터 로딩 중…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- 페이지네이션 -->
+    <div class="pagination">
+      <div class="per-page-wrap">
+        <span>페이지당</span>
+        <select class="per-page-select" id="per-page-select">
+          <option value="20">20개</option>
+          <option value="50">50개</option>
+          <option value="100">100개</option>
+          <option value="200">200개</option>
+        </select>
+      </div>
+      <div id="pag-info" class="pag-info"></div>
+      <div class="pag-controls" id="pag-controls"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Error detail modal -->
+<div class="modal-backdrop hidden" id="error-modal" onclick="closeModal(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">오류 상세</span>
+      <button class="modal-close" onclick="closeModal()" aria-label="닫기">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <span class="modal-field-label">오류 내용</span>
+        <div class="modal-field-value detail" id="modal-detail">—</div>
+      </div>
+      <div class="modal-meta">
+        <div class="modal-field">
+          <span class="modal-field-label">발생 시간</span>
+          <span class="modal-field-value" id="modal-time">—</span>
+        </div>
+        <div class="modal-field">
+          <span class="modal-field-label">사용자 번호</span>
+          <span class="modal-field-value" id="modal-user-no">—</span>
+        </div>
+        <div class="modal-field">
+          <span class="modal-field-label">유형</span>
+          <span class="modal-field-value" id="modal-user-type">—</span>
+        </div>
+        <div class="modal-field">
+          <span class="modal-field-label">오류 분류</span>
+          <span class="modal-field-value" id="modal-category">—</span>
+        </div>
+        <div class="modal-field">
+          <span class="modal-field-label">디바이스</span>
+          <span class="modal-field-value" id="modal-device">—</span>
+        </div>
+        <div class="modal-field">
+          <span class="modal-field-label">앱 버전</span>
+          <span class="modal-field-value" id="modal-version">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- No-data modal -->
+<div class="modal-backdrop hidden" id="nodata-modal" onclick="closeNoDataModal(event)">
+  <div class="nodata-modal">
+    <div class="nodata-icon">📭</div>
+    <div class="nodata-msg">해당 기간에는 데이터가 존재하지 않습니다.</div>
+    <button class="nodata-close" onclick="closeNoDataModal()">확인</button>
+  </div>
+</div>
+
+<script>
+// ── 색상 팔레트 ───────────────────────────────────────────────────────────────
+const C = {
+  purple: '#7c6deb', purple2: '#a99ef5', purple3: '#5548c8',
+  teal:   '#1da87c', teal2:   '#4dd4a0',
+  amber:  '#e8a317', coral:   '#e05c3a',
+  blue:   '#4a90d9', pink:    '#d45380',
+  gray:   '#3a4060', text:    '#e2e4f0', muted: '#8b90a8',
+  grid:   'rgba(255,255,255,0.05)',
+};
+const CAT_COLORS = [C.purple, C.teal, C.amber, C.coral, C.blue, C.pink, '#9b59b6'];
+
+// ── Chart.js 기본 설정 ───────────────────────────────────────────────────────
+Chart.defaults.color = C.muted;
+Chart.defaults.borderColor = C.grid;
+Chart.defaults.font = { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", size: 12 };
+
+const baseAxis = {
+  grid: { color: C.grid },
+  ticks: { color: C.muted },
+};
+
+// ── 차트 인스턴스 ────────────────────────────────────────────────────────────
+let charts = {};
+
+function makeChart(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), cfg);
+  return charts[id];
+}
+
+// ── 유틸 ─────────────────────────────────────────────────────────────────────
+function fmtChange(val) {
+  if (val === null || val === undefined) return { html: '데이터 없음', cls: 'neu' };
+  const sign = val > 0 ? '▲' : val < 0 ? '▼' : '─';
+  const cls  = val > 0 ? 'up' : val < 0 ? 'dn' : 'neu';
+  const color = val > 0 ? '전일 대비 증가' : val < 0 ? '전일 대비 감소' : '변화 없음';
+  return { html: `${sign} ${Math.abs(val)}%`, cls };
+}
+
+function setChange(el, change) {
+  const { html, cls } = fmtChange(change);
+  el.innerHTML = html;
+  el.className = `stat-change ${cls}`;
+}
+
+// ── 상태 ─────────────────────────────────────────────────────────────────────
+let currentPeriod   = 'weekly';
+let currentCategory = '';
+let currentDevice   = '';
+let currentVersion  = '';
+let currentPage     = 1;
+let currentPerPage  = 20;
+
+// 분기/반기 서브 선택 상태
+let currentSince    = '';
+let currentUntil    = '';
+let currentSubYear  = '';
+let currentSubUnit  = '';
+
+function isSubPeriod() {
+  return (currentPeriod === 'quarterly' || currentPeriod === 'semi_annual')
+    && currentSince && currentUntil;
+}
+
+// ── 날짜 계산 헬퍼 ─────────────────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-'
+    + String(d.getMonth() + 1).padStart(2, '0') + '-'
+    + String(d.getDate()).padStart(2, '0');
+}
+
+function minDate(a, b) { return a < b ? a : b; }
+
+function getQuarterRange(year, q) {
+  const starts = { Q1: `${year}-01-01`, Q2: `${year}-04-01`, Q3: `${year}-07-01`, Q4: `${year}-10-01` };
+  const ends   = { Q1: `${year}-03-31`, Q2: `${year}-06-30`, Q3: `${year}-09-30`, Q4: `${year}-12-31` };
+  return { start: starts[q], end: minDate(ends[q], todayStr()) };
+}
+
+function getHalfRange(year, h) {
+  const starts = { '상반기': `${year}-01-01`, '하반기': `${year}-07-01` };
+  const ends   = { '상반기': `${year}-06-30`, '하반기': `${year}-12-31` };
+  return { start: starts[h], end: minDate(ends[h], todayStr()) };
+}
+
+// ── 데이터 로드 ───────────────────────────────────────────────────────────────
+
+// 개요 카드 + 모든 기간·유형 차트 + 목록 전체 갱신
+async function loadAll() {
+  try {
+    const overview = await fetch('/api/overview').then(r => r.json());
+    updateOverview(overview);
+    await loadPeriodData();
+    document.getElementById('last-sync').textContent =
+      '마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+  } catch(e) {
+    console.error('데이터 로드 실패:', e);
+  }
+}
+
+function _buildRangeParams() {
+  if (isSubPeriod()) {
+    return { range: `since=${currentSince}&until=${currentUntil}`, trendPeriod: 'monthly' };
+  }
+  return { range: `period=${currentPeriod}`, trendPeriod: currentPeriod };
+}
+
+// 기간 필터 변경 → 전체 차트 + 목록 갱신 (category 리셋)
+async function loadPeriodData() {
+  if ((currentPeriod === 'quarterly' || currentPeriod === 'semi_annual') && !isSubPeriod()) return;
+  const cat = `category=${encodeURIComponent(currentCategory)}`;
+  const { range, trendPeriod } = _buildRangeParams();
+  const [trend, cats, devs, vers, opts] = await Promise.all([
+    fetch(`/api/trend?period=${trendPeriod}&${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/categories?${range}`).then(r => r.json()),
+    fetch(`/api/devices?${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/versions?${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/filter-options?${range}&${cat}`).then(r => r.json()),
+  ]);
+  updateTrend(trend);   // → updatePeriodTotal + updateUserType 포함
+  updateCats(cats);
+  updateDevices(devs);
+  updateVersions(vers);
+  resetDdFilters();
+  populateDd('device', opts.devices);
+  populateDd('version', opts.versions);
+  loadErrors(1);
+}
+
+// 오류 유형 필터 변경 → category-sensitive 차트 + 목록만 갱신
+async function loadCategoryData() {
+  const cat = `category=${encodeURIComponent(currentCategory)}`;
+  const { range, trendPeriod } = _buildRangeParams();
+  const [trend, devs, vers] = await Promise.all([
+    fetch(`/api/trend?period=${trendPeriod}&${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/devices?${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/versions?${range}&${cat}`).then(r => r.json()),
+  ]);
+  updateTrend(trend);
+  updateDevices(devs);
+  updateVersions(vers);
+  loadErrors(1);
+}
+
+async function loadErrors(page = 1) {
+  currentPage = page;
+  const tbody = document.getElementById('error-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="empty"><div class="loading"><div class="spinner"></div>로딩 중…</div></td></tr>';
+
+  const params = new URLSearchParams({ page, per_page: currentPerPage });
+  if (isSubPeriod()) {
+    params.set('since', currentSince);
+    params.set('until', currentUntil);
+  } else {
+    params.set('period', currentPeriod);
+  }
+  if (currentCategory) params.set('category', currentCategory);
+  if (currentDevice)   params.set('device',   currentDevice);
+  if (currentVersion)  params.set('version',  currentVersion);
+  const data = await fetch(`/api/errors?${params}`).then(r => r.json());
+  updateTable(data);
+}
+
+// ── 개별 업데이트 함수 ────────────────────────────────────────────────────────
+
+function updateOverview(d) {
+  document.getElementById('s-week').textContent  = d.week.count.toLocaleString();
+  document.getElementById('s-month').textContent = d.month.count.toLocaleString();
+  setChange(document.getElementById('s-week-chg'),  d.week.change);
+  setChange(document.getElementById('s-month-chg'), d.month.change);
+
+}
+
+const PERIOD_META = {
+  weekly:      { label: '최근 7일',    sub: '주별 기준 총 오류' },
+  daily:       { label: '최근 30일',   sub: '일별 기준 총 오류' },
+  monthly:     { label: '최근 12개월', sub: '월별 기준 총 오류' },
+  quarterly:   { label: '분기별',      sub: '분기 기준 총 오류' },
+  semi_annual: { label: '반기별',      sub: '반기 기준 총 오류' },
+  annual:      { label: '전체 기간',   sub: '연도별 기준 총 오류' },
+};
+
+function _subPeriodLabel() {
+  if (!isSubPeriod()) return null;
+  return currentPeriod === 'quarterly'
+    ? `${currentSubYear}년 ${currentSubUnit}`
+    : `${currentSubYear}년 ${currentSubUnit}`;
+}
+
+function updatePeriodTotal(d) {
+  const total = d.total ?? (d.student.reduce((a, b) => a + b, 0) + d.teacher.reduce((a, b) => a + b, 0));
+  const subLabel = _subPeriodLabel();
+  const meta = PERIOD_META[currentPeriod];
+  document.getElementById('s-period-label').textContent = (subLabel || meta.label) + ' 합계';
+  document.getElementById('s-period').textContent       = total.toLocaleString();
+  document.getElementById('s-period-sub').textContent   = meta.sub;
+}
+
+function updateTrend(d) {
+  makeChart('chart-trend', {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [
+        {
+          label: '학생',
+          data: d.student,
+          borderColor: C.purple,
+          backgroundColor: 'rgba(124,109,235,0.12)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: '교사',
+          data: d.teacher,
+          borderColor: C.teal,
+          backgroundColor: 'rgba(29,168,124,0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: C.muted, boxWidth: 12, padding: 16 } },
+        tooltip: { backgroundColor: '#1c2133', borderColor: '#2a3048', borderWidth: 1, titleColor: C.text, bodyColor: C.muted },
+      },
+      scales: {
+        x: { ...baseAxis, ticks: { ...baseAxis.ticks, maxTicksLimit: 12 } },
+        y: { ...baseAxis, beginAtZero: true },
+      },
+    },
+  });
+  updatePeriodTotal(d);
+  // 사용자 유형 차트는 trend 데이터(period+category 반영)에서 도출
+  updateUserType(
+    d.student.reduce((a, b) => a + b, 0),
+    d.teacher.reduce((a, b) => a + b, 0)
+  );
+}
+
+function updateCats(d) {
+  const label = _subPeriodLabel() || (PERIOD_META[currentPeriod] || {}).label || '기간';
+  document.getElementById('s-top-cats-label').textContent = `${label} 오류 유형 Top 3`;
+  const top3 = d.slice(0, 3);
+  document.getElementById('s-top-cats').innerHTML = top3.length
+    ? top3.map((c, i) => `
+        <div class="top-cat-row">
+          <span class="top-cat-rank">${i + 1}.</span>
+          <span class="top-cat-name">${c.name}</span>
+          <span class="top-cat-count">${label} ${c.count.toLocaleString()}건</span>
+        </div>`).join('')
+    : '<span style="color:var(--muted);font-size:13px">데이터 없음</span>';
+
+  makeChart('chart-cat', {
+    type: 'doughnut',
+    data: {
+      labels: d.map(r => r.name),
+      datasets: [{
+        data: d.map(r => r.count),
+        backgroundColor: CAT_COLORS,
+        borderColor: '#1c2133',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'right', labels: { color: C.muted, boxWidth: 10, padding: 10, font: { size: 11 } } },
+        tooltip: { backgroundColor: '#1c2133', borderColor: '#2a3048', borderWidth: 1, titleColor: C.text, bodyColor: C.muted },
+      },
+    },
+  });
+}
+
+function updateUserType(student_total, teacher_total) {
+  makeChart('chart-user', {
+    type: 'doughnut',
+    data: {
+      labels: ['학생', '교사'],
+      datasets: [{
+        data: [student_total, teacher_total],
+        backgroundColor: [C.purple, C.teal],
+        borderColor: '#1c2133',
+        borderWidth: 2,
+        hoverOffset: 4,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: C.muted, boxWidth: 10, padding: 12 } },
+        tooltip: { backgroundColor: '#1c2133', borderColor: '#2a3048', borderWidth: 1, titleColor: C.text, bodyColor: C.muted },
+      },
+    },
+  });
+}
+
+function hBar(id, data, color) {
+  const wrap = document.getElementById(id).closest('.chart-wrap');
+  if (wrap) wrap.style.height = Math.max(250, data.length * 34) + 'px';
+  makeChart(id, {
+    type: 'bar',
+    data: {
+      labels: data.map(r => r.name),
+      datasets: [{
+        data: data.map(r => r.count),
+        backgroundColor: color + '99',
+        borderColor: color,
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1c2133', borderColor: '#2a3048', borderWidth: 1, titleColor: C.text, bodyColor: C.muted } },
+      scales: {
+        x: { ...baseAxis, beginAtZero: true },
+        y: {
+          ...baseAxis,
+          ticks: { color: C.muted, font: { size: 11 } },
+          afterFit(scale) {
+            // 실제 렌더링 폭 기준으로 Y축 너비를 동적으로 설정 → 레이블 생략 방지
+            const ctx = scale.chart.ctx;
+            ctx.save();
+            ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const maxW = Math.max(0, ...scale.chart.data.labels.map(l => ctx.measureText(String(l)).width));
+            ctx.restore();
+            scale.width = Math.ceil(maxW) + 16;
+          },
+        },
+      },
+    },
+  });
+}
+
+function updateDevices(d)  { hBar('chart-device',  d, C.amber); }
+function updateVersions(d) { hBar('chart-version', d, C.teal); }
+
+function updateTable(data) {
+  const tbody   = document.getElementById('error-tbody');
+  const errors  = data.items || [];
+  const total   = data.total || 0;
+  const page    = data.page  || 1;
+  const perPage = data.per_page || currentPerPage;
+  const totalPages = data.total_pages || 1;
+
+  const start = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const end   = Math.min(page * perPage, total);
+
+  document.getElementById('error-count').textContent = `총 ${total.toLocaleString()}건`;
+  document.getElementById('pag-info').textContent =
+    total > 0 ? `${start.toLocaleString()} – ${end.toLocaleString()} / ${total.toLocaleString()}건` : '';
+
+  if (!errors.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">데이터 없음</td></tr>';
+    renderPagination(page, totalPages);
+    return;
+  }
+
+  tbody.innerHTML = errors.map((e, i) => {
+    const pill  = e.user_type === 'STUDENT' ? 'pill-student' : 'pill-teacher';
+    const label = e.user_type === 'STUDENT' ? '학생' : e.user_type === 'TEACHER' ? '교사' : e.user_type;
+    const time  = e.issue_time ? e.issue_time.replace('T', ' ').slice(0, 16) : '—';
+    const detail = (e.error_detail || '—').replace(/</g,'&lt;');
+    return `<tr onclick="openModal(${i})">
+      <td class="td-time">${time}</td>
+      <td>${e.send_user_no || '—'}</td>
+      <td><span class="pill ${pill}">${label}</span></td>
+      <td><span class="pill pill-cat">${e.error_category || '기타'}</span></td>
+      <td class="td-detail">${detail}</td>
+      <td>${e.device_identifier || '—'}</td>
+      <td>${e.app_version || '—'}</td>
+    </tr>`;
+  }).join('');
+  window._errorItems = errors;
+
+  renderPagination(page, totalPages);
+}
+
+function renderPagination(page, totalPages) {
+  const wrap = document.getElementById('pag-controls');
+  if (totalPages <= 1) { wrap.innerHTML = ''; return; }
+
+  // 표시할 페이지 번호 계산 (현재 페이지 ±2, 항상 첫/마지막 포함)
+  const pages = new Set([1, totalPages, page]);
+  for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) pages.add(i);
+  const sorted = [...pages].sort((a, b) => a - b);
+
+  let html = `<button class="pag-btn" ${page <= 1 ? 'disabled' : ''} onclick="loadErrors(${page - 1})">‹</button>`;
+
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) html += `<button class="pag-btn pag-ellipsis" disabled>…</button>`;
+    html += `<button class="pag-btn ${p === page ? 'active' : ''}" onclick="loadErrors(${p})">${p}</button>`;
+    prev = p;
+  }
+
+  html += `<button class="pag-btn" ${page >= totalPages ? 'disabled' : ''} onclick="loadErrors(${page + 1})">›</button>`;
+  wrap.innerHTML = html;
+}
+
+// ── 기간 선택 이벤트 ──────────────────────────────────────────────────────────
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPeriod   = btn.dataset.period;
+    currentCategory = '';
+    currentSince    = '';
+    currentUntil    = '';
+    currentSubYear  = '';
+    currentSubUnit  = '';
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.cat-btn[data-cat=""]').classList.add('active');
+
+    if (currentPeriod === 'quarterly' || currentPeriod === 'semi_annual') {
+      await openSubPeriodBar();
+    } else {
+      hideSubPeriodBar();
+      loadPeriodData();
+    }
+  });
+});
+
+// ── 오류 유형 필터 이벤트 ────────────────────────────────────────────────────
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCategory = btn.dataset.cat;
+    loadCategoryData();   // category-sensitive 차트 + 목록만 갱신
+  });
+});
+
+// ── 페이지당 개수 변경 이벤트 ────────────────────────────────────────────────
+document.getElementById('per-page-select').addEventListener('change', function() {
+  currentPerPage = parseInt(this.value);
+  loadErrors(1);
+});
+
+// ── 최초 실행 + 5분 자동 갱신 ────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 60 * 60 * 1000);
+
+// ── 디바이스 / 앱 버전 드롭다운 필터 ─────────────────────────────────────────
+const DD_STATE = {
+  device:  { options: [], value: '' },
+  version: { options: [], value: '' },
+};
+
+function populateDd(key, options) {
+  DD_STATE[key].options = options;
+  renderDdList(key, '');
+  document.getElementById(`dd-${key}-search`).value = '';
+}
+
+function renderDdList(key, query) {
+  const list    = document.getElementById(`dd-${key}-list`);
+  const current = DD_STATE[key].value;
+  const items   = DD_STATE[key].options.filter(o =>
+    !query || o.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const mkItem = (value, label) => {
+    const li = document.createElement('li');
+    li.className = 'dd-item' + (current === value ? ' active' : '');
+    li.textContent = label;
+    li.addEventListener('click', () => selectDd(key, value));
+    return li;
+  };
+
+  list.innerHTML = '';
+  list.appendChild(mkItem('', '전체'));
+  if (items.length) {
+    items.forEach(o => list.appendChild(mkItem(o, o)));
+  } else {
+    const empty = document.createElement('li');
+    empty.className = 'dd-empty';
+    empty.textContent = '검색 결과 없음';
+    list.appendChild(empty);
+  }
+}
+
+function toggleDd(key) {
+  const panel = document.getElementById(`dd-${key}-panel`);
+  const btn   = document.getElementById(`dd-${key}-btn`);
+  const isOpen = panel.style.display !== 'none';
+  closeAllDd();
+  if (!isOpen) {
+    panel.style.display = 'block';
+    btn.classList.add('open');
+    document.getElementById(`dd-${key}-search`).focus();
+  }
+}
+
+function closeAllDd() {
+  ['device', 'version'].forEach(key => {
+    document.getElementById(`dd-${key}-panel`).style.display = 'none';
+    document.getElementById(`dd-${key}-btn`).classList.remove('open');
+  });
+}
+
+function searchDd(key) {
+  const q = document.getElementById(`dd-${key}-search`).value;
+  renderDdList(key, q);
+}
+
+function selectDd(key, value) {
+  DD_STATE[key].value = value;
+  if (key === 'device')  currentDevice  = value;
+  if (key === 'version') currentVersion = value;
+
+  const label = value || (key === 'device' ? '디바이스' : '앱 버전');
+  document.getElementById(`dd-${key}-label`).textContent = label;
+  const btn = document.getElementById(`dd-${key}-btn`);
+  btn.classList.toggle('selected', !!value);
+
+  updateResetBtn();
+  renderDdList(key, document.getElementById(`dd-${key}-search`).value);
+  closeAllDd();
+  loadErrors(1);
+}
+
+function updateResetBtn() {
+  const active = currentDevice || currentVersion;
+  document.getElementById('dd-reset-btn').style.display = active ? 'inline-flex' : 'none';
+}
+
+function resetDdFilters() {
+  ['device', 'version'].forEach(key => {
+    DD_STATE[key].value = '';
+    document.getElementById(`dd-${key}-label`).textContent = key === 'device' ? '디바이스' : '앱 버전';
+    document.getElementById(`dd-${key}-btn`).classList.remove('selected');
+  });
+  currentDevice = '';
+  currentVersion = '';
+  document.getElementById('dd-reset-btn').style.display = 'none';
+}
+
+function resetErrorFilters() {
+  resetDdFilters();
+  loadErrors(1);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dd-wrap')) closeAllDd();
+});
+
+// ── 분기/반기 서브 선택 바 ─────────────────────────────────────────────────────
+async function openSubPeriodBar() {
+  const bar = document.getElementById('sub-period-bar');
+  bar.style.display = 'flex';
+  document.getElementById('sub-unit-row').style.display = 'none';
+  document.getElementById('sub-period-hint').textContent = '연도를 선택하세요';
+  document.getElementById('sub-year-row').innerHTML = '<span style="color:var(--muted);font-size:12px">불러오는 중…</span>';
+
+  const years = await fetch('/api/years').then(r => r.json());
+  renderYearPills(years);
+}
+
+function hideSubPeriodBar() {
+  document.getElementById('sub-period-bar').style.display = 'none';
+  document.getElementById('sub-year-row').innerHTML = '';
+  document.getElementById('sub-unit-row').innerHTML = '';
+}
+
+function renderYearPills(years) {
+  const row = document.getElementById('sub-year-row');
+  row.innerHTML = '';
+  if (!years.length) {
+    row.innerHTML = '<span style="color:var(--muted);font-size:12px">데이터 없음</span>';
+    return;
+  }
+  years.forEach(year => {
+    const btn = document.createElement('button');
+    btn.className = 'sub-year-btn';
+    btn.textContent = `${year}년`;
+    btn.addEventListener('click', () => selectSubYear(year));
+    row.appendChild(btn);
+  });
+}
+
+function selectSubYear(year) {
+  currentSubYear = year;
+  currentSubUnit = '';
+  document.querySelectorAll('.sub-year-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent === `${year}년`);
+  });
+  renderUnitPills();
+}
+
+function renderUnitPills() {
+  const isQtr = currentPeriod === 'quarterly';
+  const units = isQtr ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['상반기', '하반기'];
+  const row = document.getElementById('sub-unit-row');
+  row.style.display = 'flex';
+  row.innerHTML = '';
+
+  const today = todayStr();
+  units.forEach(unit => {
+    const range = isQtr ? getQuarterRange(currentSubYear, unit) : getHalfRange(currentSubYear, unit);
+    const isFuture = range.start > today;
+    const btn = document.createElement('button');
+    btn.className = 'sub-unit-btn' + (isFuture ? '' : '');
+    btn.textContent = unit;
+    btn.disabled = isFuture;
+    if (!isFuture) btn.addEventListener('click', () => selectSubUnit(unit));
+    row.appendChild(btn);
+  });
+
+  const hint = isQtr ? '분기를 선택하세요' : '반기를 선택하세요';
+  document.getElementById('sub-period-hint').textContent = hint;
+}
+
+async function selectSubUnit(unit) {
+  const isQtr = currentPeriod === 'quarterly';
+  currentSubUnit = unit;
+  document.querySelectorAll('.sub-unit-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent === unit);
+  });
+
+  const range = isQtr ? getQuarterRange(currentSubYear, unit) : getHalfRange(currentSubYear, unit);
+
+  const result = await fetch(
+    `/api/count-range?start=${range.start}&end=${range.end}`
+  ).then(r => r.json());
+
+  if (result.count === 0) {
+    showNoDataModal();
+    document.querySelectorAll('.sub-unit-btn').forEach(b => b.classList.remove('active'));
+    currentSubUnit = '';
+    return;
+  }
+
+  currentSince = range.start;
+  currentUntil = range.end;
+  currentCategory = '';
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.cat-btn[data-cat=""]').classList.add('active');
+  resetDdFilters();
+  loadPeriodData();
+}
+
+// ── 데이터 없음 모달 ───────────────────────────────────────────────────────────
+function showNoDataModal() {
+  document.getElementById('nodata-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeNoDataModal(event) {
+  if (event && event.target !== document.getElementById('nodata-modal')) return;
+  document.getElementById('nodata-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+// ── 오류 상세 모달 ────────────────────────────────────────────────────────────
+function openModal(idx) {
+  const e = (window._errorItems || [])[idx];
+  if (!e) return;
+
+  const userLabel = e.user_type === 'STUDENT' ? '학생' : e.user_type === 'TEACHER' ? '교사' : (e.user_type || '—');
+  const time = e.issue_time ? e.issue_time.replace('T', ' ').replace('+09:00', '') : '—';
+
+  document.getElementById('modal-detail').textContent    = e.error_detail || '—';
+  document.getElementById('modal-time').textContent      = time;
+  document.getElementById('modal-user-no').textContent   = e.send_user_no || '—';
+  document.getElementById('modal-user-type').textContent = userLabel;
+  document.getElementById('modal-category').textContent  = e.error_category || '기타';
+  document.getElementById('modal-device').textContent    = [e.device_info, e.device_identifier].filter(Boolean).join(' · ') || '—';
+  document.getElementById('modal-version').textContent   = e.app_version || '—';
+
+  document.getElementById('error-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('error-modal')) return;
+  document.getElementById('error-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeNoDataModal(); }
+});
+</script>
+</body>
+</html>
