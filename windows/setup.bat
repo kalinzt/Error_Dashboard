@@ -35,6 +35,9 @@ if not exist ".env" (
     pause
 )
 
+:: 로그 디렉토리 생성
+if not exist "logs" mkdir logs
+
 :: 작업 스케줄러 등록
 echo [4/4] Windows 작업 스케줄러 등록 중...
 
