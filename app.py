@@ -36,14 +36,15 @@ def api_trend():
     기간별 오류 추이
     ?period=daily|monthly|quarterly|semi_annual|annual[&since=YYYY-MM-DD&until=YYYY-MM-DD]
     """
-    period   = request.args.get("period", "monthly")
-    category = request.args.get("category", "")
-    since    = request.args.get("since", "")
-    until    = request.args.get("until", "")
-    valid    = {"weekly", "daily", "monthly", "quarterly", "semi_annual", "annual"}
+    period    = request.args.get("period", "monthly")
+    category  = request.args.get("category", "")
+    since     = request.args.get("since", "")
+    until     = request.args.get("until", "")
+    breakdown = request.args.get("breakdown", "user_type")
+    valid     = {"weekly", "daily", "monthly", "quarterly", "semi_annual", "annual"}
     if period not in valid:
         return jsonify({"error": "invalid period"}), 400
-    return jsonify(db.trend(period, category, start=since, end=until))
+    return jsonify(db.trend(period, category, start=since, end=until, breakdown=breakdown))
 
 
 def _resolve_since_until(period: str, since: str, until: str):
@@ -107,11 +108,13 @@ def api_errors():
     category = request.args.get("category", "")
     device   = request.args.get("device", "")
     version  = request.args.get("version", "")
+    user_no  = request.args.get("user_no", "")
+    date     = request.args.get("date", "")
     since    = request.args.get("since", "")
     until    = request.args.get("until", "")
     s        = since or (db.period_since(period) if period else None)
     u        = until or None
-    return jsonify(db.recent_errors(page, per_page, s, u, category, device, version))
+    return jsonify(db.recent_errors(page, per_page, s, u, category, device, version, user_no, date))
 
 
 @app.route("/api/years")
@@ -129,6 +132,18 @@ def api_count_range():
     if not start or not end:
         return jsonify({"count": 0})
     return jsonify({"count": db.count_in_range(start, end, category)})
+
+
+@app.route("/api/errors/<int:error_id>/category", methods=["PATCH"])
+def api_update_category(error_id):
+    """오류 분류 수동 보정"""
+    VALID = {"컨텐츠", "펜/필기", "오디오/마이크", "화면/UI", "연결/끊김", "앱/업데이트", "앱/기능", "기타"}
+    data     = request.get_json(silent=True) or {}
+    category = data.get("category", "").strip()
+    if category not in VALID:
+        return jsonify({"ok": False, "error": "invalid category"}), 400
+    ok = db.update_category(error_id, category)
+    return jsonify({"ok": ok})
 
 
 @app.route("/api/health")

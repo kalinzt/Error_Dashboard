@@ -141,7 +141,7 @@ def overview() -> dict:
     }
 
 
-def trend(period: str, category: str = "", start: str = "", end: str = "") -> dict:
+def trend(period: str, category: str = "", start: str = "", end: str = "", breakdown: str = "user_type") -> dict:
     """
     기간별 오류 발생 추이.
     period: 그룹핑 단위 (weekly|daily=일별, monthly=월별, quarterly=분기별,
@@ -189,6 +189,33 @@ def trend(period: str, category: str = "", start: str = "", end: str = "") -> di
             params.append(category)
 
         where = ("WHERE " + " AND ".join(conds)) if conds else ""
+
+        if breakdown == "category":
+            rows = conn.execute(f"""
+                SELECT {label_expr} as label,
+                       COALESCE(error_category, '기타') as cat,
+                       COUNT(*) as cnt
+                FROM error_reports {where}
+                GROUP BY label, cat ORDER BY label, cat
+            """, tuple(params)).fetchall()
+            label_cat: dict = {}
+            for r in rows:
+                label_cat.setdefault(r["label"], {})[r["cat"]] = r["cnt"]
+            all_labels = sorted(label_cat.keys())
+            all_cats = sorted(
+                {c for d in label_cat.values() for c in d},
+                key=lambda c: -sum(d.get(c, 0) for d in label_cat.values()),
+            )
+            return {
+                "labels":     all_labels,
+                "breakdown":  "category",
+                "categories": [
+                    {"name": cat, "data": [label_cat[l].get(cat, 0) for l in all_labels]}
+                    for cat in all_cats
+                ],
+                "total": sum(r["cnt"] for r in rows),
+            }
+
         rows = conn.execute(f"""
             SELECT {label_expr} as label,
                    COUNT(*) as total,
@@ -199,10 +226,11 @@ def trend(period: str, category: str = "", start: str = "", end: str = "") -> di
         """, tuple(params)).fetchall()
 
     return {
-        "labels":  [r["label"]   for r in rows],
-        "student": [r["student"] for r in rows],
-        "teacher": [r["teacher"] for r in rows],
-        "total":   sum(r["total"] for r in rows),
+        "labels":    [r["label"]   for r in rows],
+        "breakdown": "user_type",
+        "student":   [r["student"] for r in rows],
+        "teacher":   [r["teacher"] for r in rows],
+        "total":     sum(r["total"] for r in rows),
     }
 
 
@@ -329,6 +357,16 @@ def available_years() -> list[int]:
     return [r["year"] for r in rows]
 
 
+def update_category(error_id: int, category: str) -> bool:
+    """오류 분류를 수동으로 보정. id 기준으로 error_category 업데이트."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE error_reports SET error_category = ? WHERE id = ?",
+            (category, error_id)
+        )
+    return cur.rowcount == 1
+
+
 def count_in_range(start: str, end: str, category: str = "") -> int:
     """지정 날짜 범위 내 레코드 수"""
     conds = ["issue_date >= ?", "issue_date <= ?"]
@@ -347,7 +385,9 @@ def recent_errors(page: int = 1, per_page: int = 20,
                   until: str | None = None,
                   category: str = "",
                   device: str = "",
-                  version: str = "") -> dict:
+                  version: str = "",
+                  user_no: str = "",
+                  date: str = "") -> dict:
     """
     페이지네이션된 오류 목록.
     반환: { items, total, page, per_page, total_pages }
@@ -372,6 +412,12 @@ def recent_errors(page: int = 1, per_page: int = 20,
     if version:
         conds.append("COALESCE(NULLIF(app_version,''), '알 수 없음') = ?")
         params.append(version)
+    if user_no:
+        conds.append("send_user_no LIKE ?")
+        params.append(f"%{user_no}%")
+    if date:
+        conds.append("issue_date = ?")
+        params.append(date)
 
     where    = ("WHERE " + " AND ".join(conds)) if conds else ""
     params_t = tuple(params)

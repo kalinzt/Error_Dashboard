@@ -164,6 +164,30 @@
   .nodata-close { padding: 8px 24px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; cursor: pointer; transition: all .15s; }
   .nodata-close:hover { border-color: var(--purple); color: var(--purple2); }
 
+  /* Date filter */
+  .date-filter-input { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 5px 10px; border-radius: 8px; cursor: pointer; outline: none; transition: border-color .15s; min-width: 128px; }
+  .date-filter-input:focus { border-color: var(--purple); }
+  .date-filter-input:disabled { opacity: .35; cursor: not-allowed; }
+  .date-filter-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+  /* User no search */
+  .search-wrap { position: relative; }
+  .search-input { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 5px 28px 5px 10px; border-radius: 8px; outline: none; width: 160px; transition: border-color .15s; }
+  .search-input:focus { border-color: var(--purple); }
+  .search-input::placeholder { color: var(--muted); }
+  .search-clear { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; display: none; }
+  .search-clear:hover { color: var(--text); }
+
+  /* Category edit */
+  .cat-edit-btn { padding: 2px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; transition: all .15s; }
+  .cat-edit-btn:hover { border-color: var(--purple); color: var(--purple2); }
+  .cat-edit-select { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 13px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+  .cat-edit-select:focus { outline: none; border-color: var(--purple); }
+  .cat-save-btn { padding: 4px 14px; border-radius: 6px; border: none; background: var(--purple); color: #fff; font-size: 12px; cursor: pointer; font-weight: 500; }
+  .cat-save-btn:hover { background: var(--purple2); }
+  .cat-cancel-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+  .cat-cancel-btn:hover { border-color: var(--coral); color: var(--coral); }
+
   /* Responsive */
   @media (max-width: 1100px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -240,7 +264,8 @@
       <div class="chart-title-row">
         <div class="chart-title">오류 발생 추이</div>
         <div class="cat-filter-bar" id="cat-filter-bar">
-          <button class="cat-btn active" data-cat="">전체</button>
+          <button class="cat-btn active" id="cat-btn-sum" data-cat="" data-view="sum">전체(합계)</button>
+          <button class="cat-btn" data-cat="" data-view="category">전체(카테고리)</button>
           <button class="cat-btn" data-cat="오디오/마이크">오디오/마이크</button>
           <button class="cat-btn" data-cat="펜/필기">펜/필기</button>
           <button class="cat-btn" data-cat="연결/끊김">연결/끊김</button>
@@ -288,7 +313,13 @@
   <!-- 최근 오류 테이블 -->
   <div class="table-card">
     <div class="table-header">
-      <div class="chart-title" style="margin:0">최근 오류 목록</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="chart-title" style="margin:0">최근 오류 목록</div>
+        <div class="search-wrap">
+          <input class="search-input" id="user-no-search" type="text" placeholder="사용자 번호 검색" oninput="onUserNoInput()">
+          <button class="search-clear" id="user-no-clear" onclick="clearUserNoSearch()">✕</button>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
         <div class="table-filters">
           <button class="dd-reset-btn" id="dd-reset-btn" onclick="resetErrorFilters()" style="display:none">✕ 필터 초기화</button>
@@ -312,6 +343,7 @@
               <ul class="dd-list" id="dd-version-list"></ul>
             </div>
           </div>
+          <input type="date" class="date-filter-input" id="date-filter" onchange="onDateFilter()">
         </div>
         <span style="color:var(--muted);font-size:12px" id="error-count"></span>
       </div>
@@ -378,7 +410,24 @@
         </div>
         <div class="modal-field">
           <span class="modal-field-label">오류 분류</span>
-          <span class="modal-field-value" id="modal-category">—</span>
+          <div id="modal-category-display" style="display:flex;align-items:center;gap:8px">
+            <span class="modal-field-value" id="modal-category">—</span>
+            <button class="cat-edit-btn" onclick="startCatEdit()">수정</button>
+          </div>
+          <div id="modal-cat-edit" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
+            <select class="cat-edit-select" id="modal-cat-select">
+              <option>컨텐츠</option>
+              <option>펜/필기</option>
+              <option>오디오/마이크</option>
+              <option>화면/UI</option>
+              <option>연결/끊김</option>
+              <option>앱/업데이트</option>
+              <option>앱/기능</option>
+              <option>기타</option>
+            </select>
+            <button class="cat-save-btn" onclick="saveCatEdit()">저장</button>
+            <button class="cat-cancel-btn" onclick="cancelCatEdit()">취소</button>
+          </div>
         </div>
         <div class="modal-field">
           <span class="modal-field-label">디바이스</span>
@@ -449,10 +498,17 @@ function setChange(el, change) {
 }
 
 // ── 상태 ─────────────────────────────────────────────────────────────────────
-let currentPeriod   = 'weekly';
-let currentCategory = '';
-let currentDevice   = '';
-let currentVersion  = '';
+let currentPeriod     = 'weekly';
+let currentCategory   = '';
+let currentTrendView  = 'sum';   // 'sum' | 'category'
+let currentDevice     = '';
+let currentVersion    = '';
+let currentUserNo     = '';
+let currentDate       = '';
+
+function _getBreakdown() {
+  return (currentCategory === '' && currentTrendView === 'category') ? 'category' : 'user_type';
+}
 let currentPage     = 1;
 let currentPerPage  = 20;
 
@@ -476,6 +532,51 @@ function todayStr() {
 }
 
 function minDate(a, b) { return a < b ? a : b; }
+
+function offsetDate(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function offsetMonths(dateStr, months) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+function getPeriodDateRange() {
+  const today = todayStr();
+  if (isSubPeriod()) return { min: currentSince, max: currentUntil };
+  const map = {
+    weekly:  { min: offsetDate(today, -7),    max: today },
+    daily:   { min: offsetDate(today, -30),   max: today },
+    monthly: { min: offsetMonths(today, -12), max: today },
+    annual:  { min: '',                        max: today },
+  };
+  return map[currentPeriod] || { min: '', max: today };
+}
+function updateDatePicker() {
+  const input = document.getElementById('date-filter');
+  const notReady = (currentPeriod === 'quarterly' || currentPeriod === 'semi_annual') && !isSubPeriod();
+  if (notReady) {
+    input.disabled = true;
+    input.value = '';
+    currentDate = '';
+    return;
+  }
+  input.disabled = false;
+  const { min, max } = getPeriodDateRange();
+  input.min = min;
+  input.max = max;
+  if (currentDate && ((min && currentDate < min) || currentDate > max)) {
+    currentDate = '';
+    input.value = '';
+  }
+}
+function onDateFilter() {
+  currentDate = document.getElementById('date-filter').value;
+  updateResetBtn();
+  loadErrors(1);
+}
 
 function getQuarterRange(year, q) {
   const starts = { Q1: `${year}-01-01`, Q2: `${year}-04-01`, Q3: `${year}-07-01`, Q4: `${year}-10-01` };
@@ -517,7 +618,7 @@ async function loadPeriodData() {
   const cat = `category=${encodeURIComponent(currentCategory)}`;
   const { range, trendPeriod } = _buildRangeParams();
   const [trend, cats, devs, vers, opts] = await Promise.all([
-    fetch(`/api/trend?period=${trendPeriod}&${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/trend?period=${trendPeriod}&${range}&${cat}&breakdown=${_getBreakdown()}`).then(r => r.json()),
     fetch(`/api/categories?${range}`).then(r => r.json()),
     fetch(`/api/devices?${range}&${cat}`).then(r => r.json()),
     fetch(`/api/versions?${range}&${cat}`).then(r => r.json()),
@@ -528,6 +629,9 @@ async function loadPeriodData() {
   updateDevices(devs);
   updateVersions(vers);
   resetDdFilters();
+  currentDate = '';
+  document.getElementById('date-filter').value = '';
+  updateDatePicker();
   populateDd('device', opts.devices);
   populateDd('version', opts.versions);
   loadErrors(1);
@@ -538,7 +642,7 @@ async function loadCategoryData() {
   const cat = `category=${encodeURIComponent(currentCategory)}`;
   const { range, trendPeriod } = _buildRangeParams();
   const [trend, devs, vers] = await Promise.all([
-    fetch(`/api/trend?period=${trendPeriod}&${range}&${cat}`).then(r => r.json()),
+    fetch(`/api/trend?period=${trendPeriod}&${range}&${cat}&breakdown=${_getBreakdown()}`).then(r => r.json()),
     fetch(`/api/devices?${range}&${cat}`).then(r => r.json()),
     fetch(`/api/versions?${range}&${cat}`).then(r => r.json()),
   ]);
@@ -563,6 +667,8 @@ async function loadErrors(page = 1) {
   if (currentCategory) params.set('category', currentCategory);
   if (currentDevice)   params.set('device',   currentDevice);
   if (currentVersion)  params.set('version',  currentVersion);
+  if (currentUserNo)   params.set('user_no',  currentUserNo);
+  if (currentDate)     params.set('date',      currentDate);
   const data = await fetch(`/api/errors?${params}`).then(r => r.json());
   updateTable(data);
 }
@@ -602,53 +708,64 @@ function updatePeriodTotal(d) {
   document.getElementById('s-period-sub').textContent   = meta.sub;
 }
 
+const _trendChartOpts = {
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { labels: { color: C.muted, boxWidth: 12, padding: 16 } },
+    tooltip: { backgroundColor: '#1c2133', borderColor: '#2a3048', borderWidth: 1, titleColor: C.text, bodyColor: C.muted },
+  },
+  scales: {
+    x: { ...baseAxis, ticks: { ...baseAxis.ticks, maxTicksLimit: 12 } },
+    y: { ...baseAxis, beginAtZero: true },
+  },
+};
+
 function updateTrend(d) {
+  if (d.breakdown === 'category') {
+    _renderTrendByCategory(d);
+  } else {
+    _renderTrendByUserType(d);
+    updateUserType(
+      d.student.reduce((a, b) => a + b, 0),
+      d.teacher.reduce((a, b) => a + b, 0)
+    );
+  }
+  updatePeriodTotal(d);
+}
+
+function _renderTrendByUserType(d) {
   makeChart('chart-trend', {
     type: 'line',
     data: {
       labels: d.labels,
       datasets: [
-        {
-          label: '학생',
-          data: d.student,
-          borderColor: C.purple,
-          backgroundColor: 'rgba(124,109,235,0.12)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
-        {
-          label: '교사',
-          data: d.teacher,
-          borderColor: C.teal,
-          backgroundColor: 'rgba(29,168,124,0.10)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
+        { label: '학생', data: d.student, borderColor: C.purple, backgroundColor: 'rgba(124,109,235,0.12)', fill: true,  tension: 0.35, pointRadius: 3, pointHoverRadius: 5 },
+        { label: '교사', data: d.teacher, borderColor: C.teal,   backgroundColor: 'rgba(29,168,124,0.10)',  fill: true,  tension: 0.35, pointRadius: 3, pointHoverRadius: 5 },
       ],
     },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { color: C.muted, boxWidth: 12, padding: 16 } },
-        tooltip: { backgroundColor: '#1c2133', borderColor: '#2a3048', borderWidth: 1, titleColor: C.text, bodyColor: C.muted },
-      },
-      scales: {
-        x: { ...baseAxis, ticks: { ...baseAxis.ticks, maxTicksLimit: 12 } },
-        y: { ...baseAxis, beginAtZero: true },
-      },
-    },
+    options: _trendChartOpts,
   });
-  updatePeriodTotal(d);
-  // 사용자 유형 차트는 trend 데이터(period+category 반영)에서 도출
-  updateUserType(
-    d.student.reduce((a, b) => a + b, 0),
-    d.teacher.reduce((a, b) => a + b, 0)
-  );
+}
+
+function _renderTrendByCategory(d) {
+  makeChart('chart-trend', {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: d.categories.map((cat, i) => ({
+        label: cat.name,
+        data: cat.data,
+        borderColor: CAT_COLORS[i % CAT_COLORS.length],
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+      })),
+    },
+    options: _trendChartOpts,
+  });
 }
 
 function updateCats(d) {
@@ -821,14 +938,15 @@ document.querySelectorAll('.period-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
     document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentPeriod   = btn.dataset.period;
-    currentCategory = '';
-    currentSince    = '';
-    currentUntil    = '';
-    currentSubYear  = '';
-    currentSubUnit  = '';
+    currentPeriod    = btn.dataset.period;
+    currentCategory  = '';
+    currentTrendView = 'sum';
+    currentSince     = '';
+    currentUntil     = '';
+    currentSubYear   = '';
+    currentSubUnit   = '';
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.cat-btn[data-cat=""]').classList.add('active');
+    document.getElementById('cat-btn-sum').classList.add('active');
 
     if (currentPeriod === 'quarterly' || currentPeriod === 'semi_annual') {
       await openSubPeriodBar();
@@ -844,8 +962,9 @@ document.querySelectorAll('.cat-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentCategory = btn.dataset.cat;
-    loadCategoryData();   // category-sensitive 차트 + 목록만 갱신
+    currentCategory  = btn.dataset.cat;
+    currentTrendView = btn.dataset.view || 'sum';
+    loadCategoryData();
   });
 });
 
@@ -939,7 +1058,7 @@ function selectDd(key, value) {
 }
 
 function updateResetBtn() {
-  const active = currentDevice || currentVersion;
+  const active = currentDevice || currentVersion || currentUserNo || currentDate;
   document.getElementById('dd-reset-btn').style.display = active ? 'inline-flex' : 'none';
 }
 
@@ -956,7 +1075,31 @@ function resetDdFilters() {
 
 function resetErrorFilters() {
   resetDdFilters();
+  clearUserNoSearch(true);
+  currentDate = '';
+  document.getElementById('date-filter').value = '';
+  updateResetBtn();
   loadErrors(1);
+}
+
+let _searchTimer = null;
+function onUserNoInput() {
+  const val = document.getElementById('user-no-search').value.trim();
+  document.getElementById('user-no-clear').style.display = val ? 'block' : 'none';
+  updateResetBtn();
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    currentUserNo = val;
+    loadErrors(1);
+  }, 300);
+}
+
+function clearUserNoSearch(skipLoad = false) {
+  document.getElementById('user-no-search').value = '';
+  document.getElementById('user-no-clear').style.display = 'none';
+  currentUserNo = '';
+  updateResetBtn();
+  if (!skipLoad) loadErrors(1);
 }
 
 document.addEventListener('click', e => {
@@ -1049,11 +1192,12 @@ async function selectSubUnit(unit) {
     return;
   }
 
-  currentSince = range.start;
-  currentUntil = range.end;
-  currentCategory = '';
+  currentSince     = range.start;
+  currentUntil     = range.end;
+  currentCategory  = '';
+  currentTrendView = 'sum';
   document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector('.cat-btn[data-cat=""]').classList.add('active');
+  document.getElementById('cat-btn-sum').classList.add('active');
   resetDdFilters();
   loadPeriodData();
 }
@@ -1071,7 +1215,10 @@ function closeNoDataModal(event) {
 }
 
 // ── 오류 상세 모달 ────────────────────────────────────────────────────────────
+let _currentModalIdx = null;
+
 function openModal(idx) {
+  _currentModalIdx = idx;
   const e = (window._errorItems || [])[idx];
   if (!e) return;
 
@@ -1086,6 +1233,7 @@ function openModal(idx) {
   document.getElementById('modal-device').textContent    = [e.device_info, e.device_identifier].filter(Boolean).join(' · ') || '—';
   document.getElementById('modal-version').textContent   = e.app_version || '—';
 
+  cancelCatEdit();
   document.getElementById('error-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -1094,6 +1242,46 @@ function closeModal(event) {
   if (event && event.target !== document.getElementById('error-modal')) return;
   document.getElementById('error-modal').classList.add('hidden');
   document.body.style.overflow = '';
+}
+
+function startCatEdit() {
+  const cat = (window._errorItems[_currentModalIdx] || {}).error_category || '기타';
+  document.getElementById('modal-cat-select').value = cat;
+  document.getElementById('modal-category-display').style.display = 'none';
+  document.getElementById('modal-cat-edit').style.display = 'flex';
+}
+
+function cancelCatEdit() {
+  document.getElementById('modal-category-display').style.display = 'flex';
+  document.getElementById('modal-cat-edit').style.display = 'none';
+}
+
+async function saveCatEdit() {
+  const e        = (window._errorItems || [])[_currentModalIdx];
+  const category = document.getElementById('modal-cat-select').value;
+  if (!e) return;
+
+  const res  = await fetch(`/api/errors/${e.id}/category`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category }),
+  });
+  const data = await res.json();
+  if (!data.ok) { alert('저장에 실패했습니다.'); return; }
+
+  // 인메모리 데이터 업데이트
+  window._errorItems[_currentModalIdx].error_category = category;
+
+  // 모달 표시 업데이트
+  document.getElementById('modal-category').textContent = category;
+  cancelCatEdit();
+
+  // 테이블 행의 분류 pill 업데이트
+  const rows = document.getElementById('error-tbody').querySelectorAll('tr');
+  if (rows[_currentModalIdx]) {
+    const pill = rows[_currentModalIdx].querySelector('.pill-cat');
+    if (pill) pill.textContent = category;
+  }
 }
 
 document.addEventListener('keydown', e => {
